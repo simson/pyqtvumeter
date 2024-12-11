@@ -1,8 +1,9 @@
 import sys
+import signal
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QProgressBar, QComboBox
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtCore import QTimer, QIODevice, QSettings
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QProgressBar, QComboBox, QPushButton, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
+from PyQt5.QtCore import QTimer, QIODevice, QSettings, Qt
 from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudioFormat, QAudioInput, QAudio
 import pyqtgraph as pg
 
@@ -17,7 +18,20 @@ class AudioMonitor(QMainWindow):
         self.initUI()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_audio_level)
-        self.timer.start(20)  # Update every 100 ms
+        self.timer.start(20)  # Update every 20 ms
+
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(self.create_bar_icon(self.amplitude_history))
+        self.tray_icon.activated.connect(self.restore_from_tray)
+
+        self.tray_menu = QMenu(self)
+        restore_action = QAction("Restore", self)
+        restore_action.triggered.connect(self.restore_from_tray)
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        self.tray_menu.addAction(restore_action)
+        self.tray_menu.addAction(exit_action)
+        self.tray_icon.setContextMenu(self.tray_menu)
 
     def initUI(self):
         self.setWindowTitle('Audio Signal Monitor')
@@ -48,6 +62,9 @@ class AudioMonitor(QMainWindow):
         self.graph_widget.setXRange(0, 100)
         self.graph_widget.setYRange(0, 100)
 
+        self.minimize_button = QPushButton("Minimize to Tray", self)
+        self.minimize_button.clicked.connect(self.minimize_to_tray)
+        self.layout.addWidget(self.minimize_button)
 
         self.populate_input_sources()
 
@@ -98,7 +115,42 @@ class AudioMonitor(QMainWindow):
                 self.amplitude_history.append(amplitude/ 32768 * 100)
                 self.graph_plot.setData(self.amplitude_history)
 
+                # Update the tray icon with the latest amplitude history
+                self.update_tray_icon()
 
+    def create_bar_icon(self, values, size=64):
+        # Create a QPixmap object with the specified size
+        pixmap = QPixmap(size, size)
+        pixmap.fill(QColor("transparent"))
+
+        # Create a QPainter object to draw on the QPixmap
+        painter = QPainter(pixmap)
+        painter.setPen(QColor("white"))
+        painter.setBrush(QColor("white"))
+
+        bar_width = size / len(values)
+        for i, value in enumerate(values):
+            bar_height = int(value / 100 * size)
+            painter.drawRect(int(i * bar_width), size - bar_height, int(bar_width), bar_height)
+
+        painter.end()
+
+        # Convert QPixmap to QIcon
+        return QIcon(pixmap)
+
+    def update_tray_icon(self):
+        # Create a bar icon with the latest amplitude history
+        icon = self.create_bar_icon(self.amplitude_history)
+        self.tray_icon.setIcon(icon)
+
+    def minimize_to_tray(self):
+        self.hide()
+        self.tray_icon.show()
+
+    def restore_from_tray(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            self.show()
+            self.tray_icon.hide()
 
     def closeEvent(self, event):
         if self.audio_input is not None:
