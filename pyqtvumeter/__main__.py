@@ -1,14 +1,17 @@
 import sys
 import signal
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QProgressBar, QComboBox, QPushButton, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QLabel, QProgressBar, QComboBox, QPushButton
+from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
-from PyQt5.QtCore import QTimer, QIODevice, QSettings, Qt
+from PyQt5.QtCore import QTimer, QIODevice, QSettings
 from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudioFormat, QAudioInput, QAudio
 import pyqtgraph as pg
 
 class AudioMonitor(QMainWindow):
     def __init__(self):
+        """MainWindow initializator"""
         super().__init__()
         self.audio_input = None
         self.audio_device = None
@@ -19,6 +22,8 @@ class AudioMonitor(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_audio_level)
         self.timer.start(20)  # Update every 20 ms
+
+        self.input_devices = []
 
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(self.create_bar_icon(self.amplitude_history))
@@ -34,6 +39,7 @@ class AudioMonitor(QMainWindow):
         self.tray_icon.setContextMenu(self.tray_menu)
 
     def initUI(self):
+        """Initialize the UI (widget creation)"""
         self.setWindowTitle('Audio Signal Monitor')
         self.setGeometry(100, 100, 300, 200)
 
@@ -69,6 +75,7 @@ class AudioMonitor(QMainWindow):
         self.populate_input_sources()
 
     def populate_input_sources(self):
+        """Filler of the combobox with all audio device available"""
         self.input_devices = QAudioDeviceInfo.availableDevices(QAudio.AudioInput)
         for device in self.input_devices:
             self.combo_box.addItem(device.deviceName())
@@ -81,29 +88,31 @@ class AudioMonitor(QMainWindow):
                 self.combo_box.setCurrentIndex(index)
 
     def change_input_source(self, index):
+        """Handler of input source selection"""
         if self.audio_input is not None:
             self.audio_input.stop()
             self.audio_buffer.close()
 
         self.audio_device = self.input_devices[index]
-        format = QAudioFormat()
-        format.setSampleRate(44100)
-        format.setChannelCount(1)
-        format.setSampleSize(16)
-        format.setCodec("audio/pcm")
-        format.setByteOrder(QAudioFormat.LittleEndian)
-        format.setSampleType(QAudioFormat.SignedInt)
+        audio_format = QAudioFormat()
+        audio_format.setSampleRate(44100)
+        audio_format.setChannelCount(1)
+        audio_format.setSampleSize(16)
+        audio_format.setCodec("audio/pcm")
+        audio_format.setByteOrder(QAudioFormat.LittleEndian)
+        audio_format.setSampleType(QAudioFormat.SignedInt)
 
-        if not self.audio_device.isFormatSupported(format):
+        if not self.audio_device.isFormatSupported(audio_format):
             print("Default format not supported, trying to use the nearest.")
-            format = self.audio_device.nearestFormat(format)
+            audio_format = self.audio_device.nearestFormat(audio_format)
 
-        self.audio_input = QAudioInput(self.audio_device, format)
+        self.audio_input = QAudioInput(self.audio_device, audio_format)
         self.audio_buffer = AudioBuffer()
 
         self.audio_input.start(self.audio_buffer)
 
     def update_audio_level(self):
+        """Handler of new data"""
         if self.audio_buffer is not None:
             audio_data = self.audio_buffer.readAll()
             if not audio_data.isEmpty():
@@ -119,6 +128,7 @@ class AudioMonitor(QMainWindow):
                 self.update_tray_icon()
 
     def create_bar_icon(self, values, size=64):
+        """Generate an icon representing the Audio level"""
         # Create a QPixmap object with the specified size
         pixmap = QPixmap(size, size)
         pixmap.fill(QColor("transparent"))
@@ -139,23 +149,28 @@ class AudioMonitor(QMainWindow):
         return QIcon(pixmap)
 
     def update_tray_icon(self):
+        """Handler Update tray icon"""
         # Create a bar icon with the latest amplitude history
         icon = self.create_bar_icon(self.amplitude_history)
         self.tray_icon.setIcon(icon)
 
     def minimize_to_tray(self):
+        """Handler to minize to tray"""
         self.hide()
         self.tray_icon.show()
 
     def restore_from_tray(self, reason):
+        """Handler on restore (Click on tray)"""
         if reason == QSystemTrayIcon.Trigger:
             self.show()
             self.tray_icon.hide()
 
     def restore_from_tray_context(self, reason):
+        """Handler on restore context"""
         self.restore_from_tray(QSystemTrayIcon.Trigger)
 
     def closeEvent(self, event):
+        """On close event handler stop all captures and save last settings"""
         if self.audio_input is not None:
             self.audio_input.stop()
             self.audio_buffer.close()
@@ -166,21 +181,27 @@ class AudioMonitor(QMainWindow):
 
 
 class AudioBuffer(QIODevice):
+    """Class representing the AudioBuffer"""
+
     def __init__(self):
+        """Constructor of AudioBuffer"""
         super().__init__()
         self.buffer = bytearray()
         self.open(QIODevice.ReadWrite)
 
     def writeData(self, data):
+        """Append data to audio buffer"""
         self.buffer.extend(data)
         return len(data)
 
     def readData(self, maxlen):
+        """return maxlen data from Audio Bufer"""
         data = self.buffer[:maxlen]
         self.buffer = self.buffer[maxlen:]
         return bytes(data)
 
 def main():
+    """Run the main application"""
     app = QApplication(sys.argv)
     ex = AudioMonitor()
     ex.show()
