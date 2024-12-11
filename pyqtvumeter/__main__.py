@@ -125,12 +125,15 @@ class AudioBuffer(QIODevice):
         self.buffer = self.buffer[maxlen:]
         return bytes(data)
 
-
 def main():
     app = QApplication(sys.argv)
     ex = AudioMonitor()
     ex.show()
-    sys.exit(app.exec_()) 
+
+    # Handle SIGINT (Ctrl+C) to gracefully exit the application
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    sys.exit(app.exec_())
 
 if __name__ == '__main__':
     main()
