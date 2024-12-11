@@ -26,7 +26,7 @@ class AudioMonitor(QMainWindow):
 
         self.tray_menu = QMenu(self)
         restore_action = QAction("Restore", self)
-        restore_action.triggered.connect(self.restore_from_tray)
+        restore_action.triggered.connect(self.restore_from_tray_context)
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         self.tray_menu.addAction(restore_action)
@@ -151,6 +151,9 @@ class AudioMonitor(QMainWindow):
         if reason == QSystemTrayIcon.Trigger:
             self.show()
             self.tray_icon.hide()
+
+    def restore_from_tray_context(self, reason):
+        self.restore_from_tray(QSystemTrayIcon.Trigger)
 
     def closeEvent(self, event):
         if self.audio_input is not None:
