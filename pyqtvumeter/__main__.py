@@ -1,6 +1,7 @@
 import sys
 import signal
 import numpy as np
+import argparse
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 from PyQt5.QtWidgets import QLabel, QProgressBar, QComboBox, QPushButton
 from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction
@@ -10,7 +11,7 @@ from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudioFormat, QAudioInput, QAud
 import pyqtgraph as pg
 
 class AudioMonitor(QMainWindow):
-    def __init__(self):
+    def __init__(self, start_in_tray=False, audio_source=None):
         """MainWindow initializator"""
         super().__init__()
         self.audio_input = None
@@ -18,7 +19,6 @@ class AudioMonitor(QMainWindow):
         self.audio_buffer = None
         self.amplitude_history = [0] * 100  # Store the last 64 amplitude values
         self.settings = QSettings("perso", "AudioMonitor")
-        self.initUI()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_audio_level)
         self.timer.start(20)  # Update every 20 ms
@@ -37,6 +37,22 @@ class AudioMonitor(QMainWindow):
         self.tray_menu.addAction(restore_action)
         self.tray_menu.addAction(exit_action)
         self.tray_icon.setContextMenu(self.tray_menu)
+
+
+        self.initUI()
+
+        self.populate_input_sources()
+
+        if audio_source:
+            index = self.combo_box.findText(audio_source)
+            if index != -1:
+                self.combo_box.setCurrentIndex(index)
+
+        if start_in_tray:
+            self.minimize_to_tray()
+        else:
+            self.show()
+
 
     def initUI(self):
         """Initialize the UI (widget creation)"""
@@ -72,7 +88,6 @@ class AudioMonitor(QMainWindow):
         self.minimize_button.clicked.connect(self.minimize_to_tray)
         self.layout.addWidget(self.minimize_button)
 
-        self.populate_input_sources()
 
     def populate_input_sources(self):
         """Filler of the combobox with all audio device available"""
@@ -200,11 +215,28 @@ class AudioBuffer(QIODevice):
         self.buffer = self.buffer[maxlen:]
         return bytes(data)
 
+
+def list_audio_sources():
+    """List all available audio sources"""
+    input_devices = QAudioDeviceInfo.availableDevices(QAudio.AudioInput)
+    for device in input_devices:
+        print(device.deviceName())
+
 def main():
     """Run the main application"""
+    parser = argparse.ArgumentParser(description="Audio Signal Monitor")
+    parser.add_argument("--tray", action="store_true", help="Start directly in tray icon")
+    parser.add_argument("--source", type=str, help="Select audio source from command line")
+    parser.add_argument("--list-sources", action="store_true", help="List available audio sources")
+
+    args = parser.parse_args()
+
+    if args.list_sources:
+        list_audio_sources()
+        sys.exit(0)
+
     app = QApplication(sys.argv)
-    ex = AudioMonitor()
-    ex.show()
+    ex = AudioMonitor(start_in_tray=args.tray, audio_source=args.source)
 
     # Handle SIGINT (Ctrl+C) to gracefully exit the application
     signal.signal(signal.SIGINT, signal.SIG_DFL)
