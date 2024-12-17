@@ -11,7 +11,7 @@ from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudioFormat, QAudioInput, QAud
 import pyqtgraph as pg
 
 class AudioMonitor(QMainWindow):
-    def __init__(self, start_in_tray=False, audio_source=None):
+    def __init__(self, start_in_tray=False, audio_source=None, color="white"):
         """MainWindow initializator"""
         super().__init__()
         self.audio_input = None
@@ -19,6 +19,8 @@ class AudioMonitor(QMainWindow):
         self.audio_buffer = None
         self.amplitude_history = [0] * 100  # Store the last 64 amplitude values
         self.settings = QSettings("perso", "AudioMonitor")
+
+        self.color = QColor(color)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_audio_level)
         self.timer.start(20)  # Update every 20 ms
@@ -150,8 +152,9 @@ class AudioMonitor(QMainWindow):
 
         # Create a QPainter object to draw on the QPixmap
         painter = QPainter(pixmap)
-        painter.setPen(QColor("white"))
-        painter.setBrush(QColor("white"))
+
+        painter.setPen(self.color)
+        painter.setBrush(self.color)
 
         bar_width = size / len(values)
         for i, value in enumerate(values):
@@ -226,6 +229,7 @@ def main():
     """Run the main application"""
     parser = argparse.ArgumentParser(description="Audio Signal Monitor")
     parser.add_argument("--tray", action="store_true", help="Start directly in tray icon")
+    parser.add_argument("--color", type=str, help="Color for tray icon barplot", default="white")
     parser.add_argument("--source", type=str, help="Select audio source from command line")
     parser.add_argument("--list-sources", action="store_true", help="List available audio sources")
 
@@ -237,6 +241,7 @@ def main():
 
     app = QApplication(sys.argv)
     ex = AudioMonitor(start_in_tray=args.tray, audio_source=args.source)
+    ex = AudioMonitor(start_in_tray=args.tray, audio_source=args.source, color=args.color)
 
     # Handle SIGINT (Ctrl+C) to gracefully exit the application
     signal.signal(signal.SIGINT, signal.SIG_DFL)
